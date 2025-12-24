@@ -1507,3 +1507,20 @@ html, body {
     text-align: center;
     margin-top: 20px;
 }
+
+/* Left-aligned variants */
+.intro-section-title-large.intro-section-title-left {
+    text-align: left;
+}
+
+.intro-title-accent.intro-title-accent-left {
+    text-align: left;
+}
+
+.intro-highlight-text-main.intro-highlight-text-main-left {
+    text-align: left;
+}
+
+.intro-section-title-accent.intro-section-title-accent-left {
+    text-align: left;
+}
