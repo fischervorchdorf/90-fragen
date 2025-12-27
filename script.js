@@ -580,7 +580,7 @@ function downloadRecording(categoryId, questionIndex) {
     }
 
     // Erstelle Dateinamen
-    const fileName = `Mein Gedächtnis - Frage ${globalQuestionNumber}.webm`;
+    const fileName = `Mein Gedächtnis - Frage ${globalQuestionNumber}.mp3`;
 
     // Konvertiere Base64-Daten zu Blob
     const byteCharacters = atob(recording.data.split(',')[1]);
@@ -589,9 +589,59 @@ function downloadRecording(categoryId, questionIndex) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
     const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: 'audio/webm' });
+    const webmBlob = new Blob([byteArray], { type: 'audio/webm' });
 
-    // Erstelle Download-Link
+    // Konvertiere WebM zu MP3
+    convertWebMToMP3(webmBlob, fileName);
+}
+
+function convertWebMToMP3(webmBlob, fileName) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const arrayBuffer = e.target.result;
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        audioContext.decodeAudioData(arrayBuffer, function(audioBuffer) {
+            // Konvertiere zu MP3 mit lamejs
+            const samples = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
+            
+            // Konfiguriere MP3-Encoder
+            const mp3Encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
+            const mp3Data = [];
+            
+            // Encode in Chunks von 1152 samples
+            const maxSamples = 1152;
+            for (let i = 0; i < samples.length; i += maxSamples) {
+                const chunk = samples.subarray(i, Math.min(i + maxSamples, samples.length));
+                const mono = Int16Array.from(chunk, x => x < 0 ? x * 0x8000 : x * 0x7FFF);
+                const mp3buf = mp3Encoder.encodeBuffer(mono);
+                if (mp3buf.length > 0) {
+                    mp3Data.push(new Int8Array(mp3buf));
+                }
+            }
+            
+            // Finalisiere die MP3
+            const finalData = mp3Encoder.flush();
+            if (finalData.length > 0) {
+                mp3Data.push(new Int8Array(finalData));
+            }
+            
+            // Erstelle MP3-Blob und download
+            const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
+            downloadBlob(mp3Blob, fileName);
+            showNotification(`✓ ${fileName} heruntergeladen!`);
+        }, function(error) {
+            console.error('Fehler beim Dekodieren:', error);
+            // Fallback: Download als WebM wenn Konvertierung fehlschlägt
+            downloadBlob(webmBlob, fileName.replace('.mp3', '.webm'));
+            showNotification('Audio heruntergeladen (WebM-Format)');
+        });
+    };
+    reader.readAsArrayBuffer(webmBlob);
+}
+
+function downloadBlob(blob, fileName) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -600,8 +650,6 @@ function downloadRecording(categoryId, questionIndex) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-
-    showNotification(`✓ ${fileName} heruntergeladen!`);
 }
 
 /* ============================================
